@@ -18,29 +18,86 @@ User: Help me translate this article
 
 The main agent's model never changes. Tasks requiring a different model are delegated via OpenClaw's native `sessions_spawn(model=...)` tool.
 
+## Supported Platforms
+
+Works on all platforms supported by OpenClaw: **macOS**, **Linux**, and **Windows**.
+
 ## Installation
 
-**Step 1:** Copy the plugin directory
+### Prerequisites
+
+- OpenClaw v2026.3.0+ installed and running (via `npm install -g openclaw` or platform installer)
+- At least one model provider configured (Anthropic, OpenAI, Ollama, etc.)
+
+### Step 1: Copy the plugin
+
+**macOS / Linux:**
 
 ```bash
 cp -r model-router/ ~/.openclaw/extensions/model-router/
 ```
 
-**Step 2:** Configure (config.yaml)
+**Windows (PowerShell):**
 
-```yaml
-plugins:
-  allow:
-    - model-router
-  entries:
-    model-router:
-      hooks:
-        allowPromptInjection: true
+```powershell
+Copy-Item -Recurse model-router\ "$env:USERPROFILE\.openclaw\extensions\model-router\"
 ```
 
-`allowPromptInjection: true` is required because the plugin appends routing instructions to the system prompt via the `before_prompt_build` hook.
+Only copy the `model-router/` directory -- the rest of this repo (docs, tests, openclaw source) is for development only.
 
-**Step 3:** Restart the gateway
+### Step 2: Edit OpenClaw config
+
+Open your OpenClaw config file:
+
+- **macOS / Linux:** `~/.openclaw/config.json5`
+- **Windows:** `%USERPROFILE%\.openclaw\config.json5`
+
+Add the following:
+
+```json5
+{
+  // ... existing config ...
+  plugins: {
+    allow: [
+      "model-router"
+      // ... other allowed plugins ...
+    ],
+    entries: {
+      "model-router": {
+        hooks: {
+          allowPromptInjection: true
+        }
+      }
+    }
+  }
+}
+```
+
+`allowPromptInjection: true` is **required** -- without it, OpenClaw's security layer silently drops the `before_prompt_build` hook and routing rules will never be injected.
+
+### Step 3: Restart the gateway
+
+```bash
+openclaw gateway stop
+openclaw gateway start
+```
+
+Or if using the dev loop:
+
+```bash
+# Ctrl+C to stop, then:
+openclaw gateway start
+```
+
+### Step 4: Verify
+
+In any connected channel (Telegram, Discord, CLI, etc.):
+
+```
+/route add test rule
+```
+
+If you see `Added rule #1: test rule`, the plugin is working. Clean up with `/route remove 1`.
 
 ## Usage
 
@@ -62,15 +119,27 @@ plugins:
 
 Rules are stored locally at `~/.openclaw/plugins/model-router/rules.json` and persist across gateway restarts.
 
+### How Routing Happens
+
+1. You define rules via `/route add` (bypasses LLM, no token cost)
+2. On every message, rules are injected into the main agent's system prompt
+3. The main agent reads the rules and evaluates the incoming task
+4. If a rule matches and requires a different model, the agent calls `sessions_spawn(model="...", task="...")` to delegate
+5. The subagent runs with the specified model, returns the result
+6. If no rule matches, the main agent handles the task directly
+
+The main agent's model **never switches** -- delegation happens via subagent, avoiding token waste from context re-injection.
+
 ## Architecture
 
 | Component | Mechanism | Purpose |
 |-----------|-----------|---------|
 | `/route` command | `api.registerCommand()` | CRUD rules, bypasses LLM |
-| Prompt injection | `before_prompt_build` hook | Appends rules to system prompt |
+| Prompt injection | `before_prompt_build` hook | Appends rules to system prompt via `appendSystemContext` |
 | Task delegation | `sessions_spawn(model=...)` | Main agent spawns subagent with target model |
+| In-memory cache | Closure in `register()` | Hot-path hook reads cache, no disk I/O per message |
 
-The plugin is ~140 lines of TypeScript with zero external dependencies.
+~140 lines of TypeScript, zero external dependencies.
 
 ## Testing
 
@@ -78,40 +147,61 @@ The plugin is ~140 lines of TypeScript with zero external dependencies.
 
 ```bash
 cd model-router && npx vitest run
-# 11 tests: rules-store CRUD (7) + prompt-inject output (4)
+# 12 tests: rules-store CRUD (8) + prompt-inject output (4)
 ```
 
 **Integration tests** (requires OpenClaw source with `pnpm install`):
 
 ```bash
+# Copy test files into OpenClaw source tree
 cp tests/integration.test.ts openclaw/src/plugins/model-router-integration.test.ts
-cd openclaw && npx vitest run src/plugins/model-router-integration.test.ts
-# 8 tests: hook injection, multi-plugin coexistence, error isolation, end-to-end
+cp tests/loader.test.ts openclaw/src/plugins/model-router-loader.test.ts
+cp tests/cache.test.ts openclaw/src/plugins/model-router-cache.test.ts
+
+# Run
+cd openclaw && npx vitest run src/plugins/model-router-integration.test.ts src/plugins/model-router-loader.test.ts src/plugins/model-router-cache.test.ts
+
+# Clean up
+rm openclaw/src/plugins/model-router-*.test.ts
 ```
+
+Integration tests verify: real plugin loader (jiti), hook runner, command registration, cache refresh, multi-plugin coexistence, and error isolation.
 
 See [tests/README.md](tests/README.md) for details.
 
-## Requirements
+## Troubleshooting
 
-- OpenClaw v2026.3.0+
-- Target model providers must be configured with valid credentials
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `/route` command not recognized | Plugin not loaded | Check `plugins.allow` includes `"model-router"` and restart gateway |
+| Rules added but agent doesn't delegate | `allowPromptInjection` not set | Add `hooks.allowPromptInjection: true` in plugin entry config |
+| `sessions_spawn` fails with model error | Target provider not configured | Ensure the provider has valid API key in OpenClaw config |
+| Agent delegates but subagent fails | Model ID incorrect | Check model ID format: `provider/model-id` (e.g., `ollama/llama3.3:8b`) |
 
 ## Design Decisions
 
 - **No model switching on main agent** -- avoids token waste from re-injecting full session context into a new model
 - **LLM interprets rules** -- natural language rules are injected into the system prompt; the main agent decides when to delegate (more flexible than keyword matching)
 - **Slash commands bypass prompt injection checks** -- `api.registerCommand()` runs outside the LLM pipeline, so rules can be managed without triggering OpenClaw's security layer
+- **In-memory cache** -- rules loaded from disk once at startup, refreshed only on write commands; the per-message hook reads from memory
 
 ## Project Structure
 
 ```
-model-router/
+model-router/                  # The plugin (copy this to install)
   package.json
   openclaw.plugin.json
-  index.ts                 - Plugin entry: registers /route command + prompt hook
+  index.ts                     - Plugin entry: /route command + prompt hook + cache
   src/
-    rules-store.ts         - CRUD operations + JSON file persistence
-    prompt-inject.ts       - Builds routing instruction text for system prompt
+    rules-store.ts             - CRUD operations + JSON file persistence
+    prompt-inject.ts           - Builds routing instruction text for system prompt
+
+tests/                         # Integration tests (run inside OpenClaw source tree)
+  integration.test.ts          - Hook runner + command handler tests
+  loader.test.ts               - Real plugin loader (jiti) verification
+  cache.test.ts                - Cache refresh mechanism tests
+
+docs/                          # Research and design documentation
 ```
 
 ## Documentation
