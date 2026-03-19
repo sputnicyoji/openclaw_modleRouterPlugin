@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+
+# OpenClaw source is a shallow clone for read-only reference, not part of this repo
+openclaw/
+
+# Lock files (generated)
+package-lock.json
+pnpm-lock.yaml
