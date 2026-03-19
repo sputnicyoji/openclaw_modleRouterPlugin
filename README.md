@@ -122,9 +122,9 @@ Rules are stored locally at `~/.openclaw/plugins/model-router/rules.json` and pe
 ### How Routing Happens
 
 1. You define rules via `/route add` (bypasses LLM, no token cost)
-2. On every message, rules are injected into the main agent's system prompt
-3. The main agent reads the rules and evaluates the incoming task
-4. If a rule matches and requires a different model, the agent calls `sessions_spawn(model="...", task="...")` to delegate
+2. On every message, rules are injected into the main agent's system prompt as mandatory instructions
+3. The main agent checks if any rule matches the incoming task
+4. If a rule matches, the agent **must** spawn a subagent via `sessions_spawn(model="...", task="...")` -- it is forbidden from answering the task itself
 5. The subagent runs with the specified model, returns the result
 6. If no rule matches, the main agent handles the task directly
 

@@ -7,17 +7,20 @@ export function buildRoutingPrompt(rules: Rule[]): string {
     .map((r, i) => `${i + 1}. ${r.text}`)
     .join("\n");
 
-  return `## Model Routing Rules
+  return `## MANDATORY: Model Routing via Subagent
 
-The user has configured the following model routing rules. For each incoming task:
+You MUST use a subagent to handle tasks that match the routing rules below. Do NOT answer matching tasks yourself under any circumstances.
 
-1. Evaluate which rule best matches the task
-2. If a matching rule specifies a different model than your current model, delegate the task by calling sessions_spawn with the specified model
-3. If no rule matches or the task fits your current model, handle it directly
+For every user message:
+1. Check if any rule below matches the task
+2. If YES: spawn a subagent using sessions_spawn with the specified model. Do NOT answer the task yourself. Do NOT explain why you are delegating. Just spawn the subagent immediately.
+3. If NO rule matches: answer normally
 
 Rules:
 ${rulesList}
 
-When delegating, use: sessions_spawn(model="<model from rule>", runtime="subagent", task="<clear task description>")
-Do NOT use runtime="acp" -- model selection only works with the subagent runtime.`;
+When spawning the subagent, call:
+sessions_spawn(model="<model from matching rule>", runtime="subagent", task="<the user's original message>")
+
+Remember: when a rule matches, your ONLY job is to spawn the subagent. Never answer the task directly.`;
 }

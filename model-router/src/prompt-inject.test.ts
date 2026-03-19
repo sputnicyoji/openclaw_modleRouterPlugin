@@ -10,7 +10,7 @@ describe("buildRoutingPrompt", () => {
   it("builds prompt with single rule", () => {
     const rules: Rule[] = [{ id: 1, text: "simple tasks use ollama/llama3.3:8b" }];
     const result = buildRoutingPrompt(rules);
-    expect(result).toContain("## Model Routing Rules");
+    expect(result).toContain("Model Routing");
     expect(result).toContain("1. simple tasks use ollama/llama3.3:8b");
     expect(result).toContain("sessions_spawn");
     expect(result).toContain('runtime="subagent"');
@@ -26,9 +26,11 @@ describe("buildRoutingPrompt", () => {
     expect(result).toContain("2. coding use anthropic/claude-opus-4-5");
   });
 
-  it("does not include acp runtime", () => {
+  it("instructs to use subagent for delegation", () => {
     const rules: Rule[] = [{ id: 1, text: "test rule" }];
     const result = buildRoutingPrompt(rules);
-    expect(result).toContain("Do NOT use runtime=\"acp\"");
+    expect(result).toContain("subagent");
+    expect(result).toContain("MUST");
+    expect(result).toContain("Do NOT answer");
   });
 });

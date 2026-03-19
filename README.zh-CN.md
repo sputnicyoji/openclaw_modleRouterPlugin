@@ -115,13 +115,13 @@ openclaw gateway start
 ### 路由流程
 
 1. 用户通过 `/route add` 定义规则 (绕过 LLM，不消耗 token)
-2. 每条消息到来时，规则被注入主 agent 的 system prompt
-3. 主 agent 阅读规则，评估当前任务
-4. 如果规则匹配且需要其他模型，agent 调用 `sessions_spawn(model="...", task="...")` 委派
-5. 子 agent 使用指定模型运行，返回结果
+2. 每条消息到来时，规则作为强制指令注入主 agent 的 system prompt
+3. 主 agent 检查当前任务是否匹配任何规则
+4. 如果规则匹配，agent **必须**通过 `sessions_spawn(model="...", task="...")` 生成子代理处理，禁止自己回答
+5. 子代理使用指定模型运行，返回结果
 6. 如果没有规则匹配，主 agent 直接处理
 
-主 agent 的模型**始终不切换** -- 委派通过子 agent 完成，避免上下文重新注入的 token 浪费。
+主 agent 的模型**始终不切换** -- 委派通过子代理完成，避免上下文重新注入的 token 浪费。
 
 ## 架构
 
