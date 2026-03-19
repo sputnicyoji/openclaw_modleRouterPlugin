@@ -72,6 +72,25 @@ Rules are stored locally at `~/.openclaw/plugins/model-router/rules.json` and pe
 
 The plugin is ~140 lines of TypeScript with zero external dependencies.
 
+## Testing
+
+**Unit tests** (standalone, no OpenClaw dependency):
+
+```bash
+cd model-router && npx vitest run
+# 11 tests: rules-store CRUD (7) + prompt-inject output (4)
+```
+
+**Integration tests** (requires OpenClaw source with `pnpm install`):
+
+```bash
+cp tests/integration.test.ts openclaw/src/plugins/model-router-integration.test.ts
+cd openclaw && npx vitest run src/plugins/model-router-integration.test.ts
+# 8 tests: hook injection, multi-plugin coexistence, error isolation, end-to-end
+```
+
+See [tests/README.md](tests/README.md) for details.
+
 ## Requirements
 
 - OpenClaw v2026.3.0+

@@ -32,6 +32,7 @@ This is a research project for building a **model router plugin** (or equivalent
 openclaw_modleRouterPlugin/
   docs/                    # Project analysis reports and documentation
   model-router/            # Model Router Plugin (the deliverable)
+  tests/                   # Integration tests (run inside openclaw/ source tree)
   openclaw/                # OpenClaw source (shallow clone, read-only reference)
 ```
 

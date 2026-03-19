@@ -72,6 +72,25 @@ plugins:
 
 插件约 140 行 TypeScript，零外部依赖。
 
+## 测试
+
+**单元测试**（独立运行，不依赖 OpenClaw）:
+
+```bash
+cd model-router && npx vitest run
+# 11 个测试: 规则存储 CRUD (7) + prompt 注入文本 (4)
+```
+
+**集成测试**（需要 OpenClaw 源码并 `pnpm install`）:
+
+```bash
+cp tests/integration.test.ts openclaw/src/plugins/model-router-integration.test.ts
+cd openclaw && npx vitest run src/plugins/model-router-integration.test.ts
+# 8 个测试: 钩子注入、多插件共存、错误隔离、端到端验证
+```
+
+详见 [tests/README.md](tests/README.md)。
+
 ## 环境要求
 
 - OpenClaw v2026.3.0+
