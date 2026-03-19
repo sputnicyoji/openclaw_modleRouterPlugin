@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { join } from "node:path";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { loadRulesSync, saveRulesSync, addRule, removeRule, clearRules } from "./rules-store.js";
+import { loadRulesSync, addRule, removeRule, clearRules } from "./rules-store.js";
 
 describe("rules-store", () => {
   let tempDir: string;
@@ -20,7 +20,6 @@ describe("rules-store", () => {
   it("returns empty array when file does not exist", () => {
     const data = loadRulesSync(rulesPath);
     expect(data.rules).toEqual([]);
-    expect(data.nextId).toBe(1);
   });
 
   it("adds a rule and persists it", () => {
@@ -31,7 +30,6 @@ describe("rules-store", () => {
     const data = loadRulesSync(rulesPath);
     expect(data.rules).toHaveLength(1);
     expect(data.rules[0].text).toBe("simple tasks use ollama/llama3.3:8b");
-    expect(data.nextId).toBe(2);
   });
 
   it("adds multiple rules with incrementing IDs", () => {
@@ -41,7 +39,6 @@ describe("rules-store", () => {
     expect(data.rules).toHaveLength(2);
     expect(data.rules[0].id).toBe(1);
     expect(data.rules[1].id).toBe(2);
-    expect(data.nextId).toBe(3);
   });
 
   it("removes a rule by ID", () => {
@@ -68,12 +65,19 @@ describe("rules-store", () => {
 
     const data = loadRulesSync(rulesPath);
     expect(data.rules).toHaveLength(0);
-    expect(data.nextId).toBe(1);
   });
 
   it("handles corrupt file gracefully", () => {
     writeFileSync(rulesPath, "not json!!!");
     const data = loadRulesSync(rulesPath);
     expect(data.rules).toEqual([]);
+  });
+
+  it("derives next ID from existing rules after clear", () => {
+    addRule(rulesPath, "rule one");
+    addRule(rulesPath, "rule two");
+    clearRules(rulesPath);
+    const rule = addRule(rulesPath, "rule three");
+    expect(rule.id).toBe(1);
   });
 });

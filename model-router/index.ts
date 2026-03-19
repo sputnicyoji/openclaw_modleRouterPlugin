@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { loadRulesSync, addRule, removeRule, clearRules } from "./src/rules-store.js";
 import { buildRoutingPrompt } from "./src/prompt-inject.js";
+import type { RulesData } from "./src/rules-store.js";
 
 const DEFAULT_RULES_PATH = join(
   homedir(),
@@ -12,6 +13,61 @@ const DEFAULT_RULES_PATH = join(
   "rules.json",
 );
 
+export function handleRouteCommand(
+  args: string,
+  rulesFilePath: string,
+  cache: { data: RulesData; prompt: string },
+): { text: string } {
+  const trimmed = args.trim();
+  const spaceIdx = trimmed.indexOf(" ");
+  const sub = spaceIdx === -1 ? trimmed : trimmed.slice(0, spaceIdx);
+  const rest = spaceIdx === -1 ? "" : trimmed.slice(spaceIdx + 1).trim();
+
+  switch (sub.toLowerCase()) {
+    case "add": {
+      if (!rest) {
+        return { text: "Usage: /route add <rule>\nExample: /route add simple tasks use ollama/llama3.3:8b" };
+      }
+      const rule = addRule(rulesFilePath, rest);
+      refreshCache(rulesFilePath, cache);
+      return { text: `Added rule #${rule.id}: ${rule.text}` };
+    }
+    case "list": {
+      if (cache.data.rules.length === 0) {
+        return { text: "No routing rules configured. Use /route add <rule> to add one." };
+      }
+      const lines = cache.data.rules.map((r) => `${r.id}. ${r.text}`);
+      return { text: `Current routing rules:\n${lines.join("\n")}` };
+    }
+    case "remove": {
+      const id = parseInt(rest, 10);
+      if (isNaN(id)) {
+        return { text: "Usage: /route remove <rule number>" };
+      }
+      const removed = removeRule(rulesFilePath, id);
+      if (removed) refreshCache(rulesFilePath, cache);
+      return { text: removed ? `Removed rule #${id}` : `Rule #${id} not found` };
+    }
+    case "clear": {
+      clearRules(rulesFilePath);
+      refreshCache(rulesFilePath, cache);
+      return { text: "Cleared all routing rules" };
+    }
+    default:
+      return {
+        text: "Usage:\n  /route add <rule>     - Add a routing rule\n  /route list           - List all rules\n  /route remove <number> - Remove a rule\n  /route clear          - Clear all rules",
+      };
+  }
+}
+
+function refreshCache(
+  rulesFilePath: string,
+  cache: { data: RulesData; prompt: string },
+): void {
+  cache.data = loadRulesSync(rulesFilePath);
+  cache.prompt = buildRoutingPrompt(cache.data.rules);
+}
+
 export default definePluginEntry({
   id: "model-router",
   name: "Model Router",
@@ -19,61 +75,24 @@ export default definePluginEntry({
 
   register(api) {
     const rulesFilePath = DEFAULT_RULES_PATH;
+    const cache = {
+      data: loadRulesSync(rulesFilePath),
+      prompt: "",
+    };
+    cache.prompt = buildRoutingPrompt(cache.data.rules);
 
-    // Slash command: /route add|list|remove|clear
     api.registerCommand({
       name: "route",
       description: "Manage model routing rules: /route add|list|remove|clear",
       acceptsArgs: true,
       handler(ctx) {
-        const args = (ctx.args ?? "").trim();
-        const spaceIdx = args.indexOf(" ");
-        const sub = spaceIdx === -1 ? args : args.slice(0, spaceIdx);
-        const rest = spaceIdx === -1 ? "" : args.slice(spaceIdx + 1).trim();
-
-        switch (sub.toLowerCase()) {
-          case "add": {
-            if (!rest) {
-              return { text: "Usage: /route add <rule>\nExample: /route add simple tasks use ollama/llama3.3:8b" };
-            }
-            const rule = addRule(rulesFilePath, rest);
-            return { text: `Added rule #${rule.id}: ${rule.text}` };
-          }
-          case "list": {
-            const data = loadRulesSync(rulesFilePath);
-            if (data.rules.length === 0) {
-              return { text: "No routing rules configured. Use /route add <rule> to add one." };
-            }
-            const lines = data.rules.map((r) => `${r.id}. ${r.text}`);
-            return { text: `Current routing rules:\n${lines.join("\n")}` };
-          }
-          case "remove": {
-            const id = parseInt(rest, 10);
-            if (isNaN(id)) {
-              return { text: "Usage: /route remove <rule number>" };
-            }
-            const removed = removeRule(rulesFilePath, id);
-            return { text: removed ? `Removed rule #${id}` : `Rule #${id} not found` };
-          }
-          case "clear": {
-            clearRules(rulesFilePath);
-            return { text: "Cleared all routing rules" };
-          }
-          default:
-            return {
-              text: "Usage:\n  /route add <rule>     - Add a routing rule\n  /route list           - List all rules\n  /route remove <number> - Remove a rule\n  /route clear          - Clear all rules",
-            };
-        }
+        return handleRouteCommand(ctx.args ?? "", rulesFilePath, cache);
       },
     });
 
-    // Hook: inject rules into system prompt
-    api.on("before_prompt_build", (_event, _ctx) => {
-      const data = loadRulesSync(rulesFilePath);
-      if (data.rules.length === 0) return undefined;
-      return {
-        appendSystemContext: buildRoutingPrompt(data.rules),
-      };
+    api.on("before_prompt_build", () => {
+      if (cache.data.rules.length === 0) return undefined;
+      return { appendSystemContext: cache.prompt };
     }, { priority: 0 });
   },
 });

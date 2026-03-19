@@ -8,21 +8,21 @@ export type Rule = {
 
 export type RulesData = {
   rules: Rule[];
-  nextId: number;
 };
 
-function emptyData(): RulesData {
-  return { rules: [], nextId: 1 };
+function nextId(rules: Rule[]): number {
+  if (rules.length === 0) return 1;
+  return Math.max(...rules.map((r) => r.id)) + 1;
 }
 
 export function loadRulesSync(rulesFilePath: string): RulesData {
   try {
     const raw = readFileSync(rulesFilePath, "utf-8");
-    const data = JSON.parse(raw) as RulesData;
-    if (!Array.isArray(data.rules)) return emptyData();
-    return data;
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data?.rules)) return { rules: [] };
+    return { rules: data.rules };
   } catch {
-    return emptyData();
+    return { rules: [] };
   }
 }
 
@@ -31,15 +31,10 @@ function save(rulesFilePath: string, data: RulesData): void {
   writeFileSync(rulesFilePath, JSON.stringify(data, null, 2), "utf-8");
 }
 
-export function saveRulesSync(rulesFilePath: string, data: RulesData): void {
-  save(rulesFilePath, data);
-}
-
 export function addRule(rulesFilePath: string, text: string): Rule {
   const data = loadRulesSync(rulesFilePath);
-  const rule: Rule = { id: data.nextId, text };
+  const rule: Rule = { id: nextId(data.rules), text };
   data.rules.push(rule);
-  data.nextId++;
   save(rulesFilePath, data);
   return rule;
 }
@@ -54,5 +49,5 @@ export function removeRule(rulesFilePath: string, id: number): boolean {
 }
 
 export function clearRules(rulesFilePath: string): void {
-  save(rulesFilePath, emptyData());
+  save(rulesFilePath, { rules: [] });
 }
