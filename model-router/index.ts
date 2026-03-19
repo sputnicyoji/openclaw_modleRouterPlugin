@@ -1,4 +1,3 @@
-import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { loadRulesSync, addRule, removeRule, clearRules } from "./src/rules-store.js";
@@ -68,12 +67,12 @@ function refreshCache(
   cache.prompt = buildRoutingPrompt(cache.data.rules);
 }
 
-export default definePluginEntry({
+export default {
   id: "model-router",
   name: "Model Router",
   description: "Natural language model routing rules via /route command",
 
-  register(api) {
+  register(api: any) {
     const rulesFilePath = DEFAULT_RULES_PATH;
     const cache = {
       data: loadRulesSync(rulesFilePath),
@@ -95,4 +94,4 @@ export default definePluginEntry({
       return { appendSystemContext: cache.prompt };
     }, { priority: 0 });
   },
-});
+};
