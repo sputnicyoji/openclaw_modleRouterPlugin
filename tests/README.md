@@ -12,7 +12,10 @@ cd model-router && npx vitest run
 
 ## Integration Tests
 
-`integration.test.ts` tests the plugin against OpenClaw's real hook runner infrastructure. It must run from inside the OpenClaw source tree because it imports OpenClaw's test helpers.
+Two integration test files that must run inside the OpenClaw source tree (they import OpenClaw internals):
+
+- `integration.test.ts` -- Hook runner + command handler tests (8 tests)
+- `loader.test.ts` -- Real plugin loader test via `loadOpenClawPlugins` + jiti (1 test)
 
 ### How to Run
 
@@ -20,17 +23,20 @@ cd model-router && npx vitest run
 # 1. Ensure OpenClaw source is available with deps installed
 cd openclaw && pnpm install
 
-# 2. Copy the test file into OpenClaw's plugin test directory
+# 2. Copy test files into OpenClaw's plugin test directory
 cp tests/integration.test.ts openclaw/src/plugins/model-router-integration.test.ts
+cp tests/loader.test.ts openclaw/src/plugins/model-router-loader.test.ts
 
 # 3. Run from OpenClaw
-cd openclaw && npx vitest run src/plugins/model-router-integration.test.ts
+cd openclaw && npx vitest run src/plugins/model-router-integration.test.ts src/plugins/model-router-loader.test.ts
 
 # 4. Clean up
-rm openclaw/src/plugins/model-router-integration.test.ts
+rm openclaw/src/plugins/model-router-integration.test.ts openclaw/src/plugins/model-router-loader.test.ts
 ```
 
 ### What It Verifies
+
+**integration.test.ts (8 tests):**
 
 | Test | Verifies |
 |------|----------|
@@ -43,11 +49,20 @@ rm openclaw/src/plugins/model-router-integration.test.ts
 | Edge cases | Empty args, invalid numbers, non-existent rules |
 | End-to-end | Command writes rule -> file persists -> hook reads -> prompt output -> rule deleted -> prompt updated |
 
-### Why It Can't Run Standalone
+**loader.test.ts (1 test):**
 
-The test imports OpenClaw's internal modules:
+| Test | Verifies |
+|------|----------|
+| Plugin loader | `index.ts` loads via `loadOpenClawPlugins` + jiti, `/route` command registered, `before_prompt_build` hook registered with priority 0 |
+
+This is the most critical test -- it proves the plugin actually works with OpenClaw's real module loading system (jiti alias resolution, SDK boundary enforcement, manifest validation).
+
+### Why They Can't Run Standalone
+
+The tests import OpenClaw's internal modules:
 - `src/plugins/hooks.js` - `createHookRunner`
 - `src/plugins/hooks.test-helpers.js` - `addTestHook`, `TEST_PLUGIN_AGENT_CTX`
 - `src/plugins/registry-empty.js` - `createEmptyPluginRegistry`
+- `src/plugins/loader.js` - `loadOpenClawPlugins`
 
-These are not exposed via the Plugin SDK (`openclaw/plugin-sdk/*`), so the test must run inside the OpenClaw source tree.
+These are not exposed via the Plugin SDK (`openclaw/plugin-sdk/*`), so the tests must run inside the OpenClaw source tree.
