@@ -29,48 +29,23 @@ Works on all platforms supported by OpenClaw: **macOS**, **Linux**, and **Window
 - OpenClaw v2026.3.0+ installed and running (via `npm install -g openclaw` or platform installer)
 - At least one model provider configured (Anthropic, OpenAI, Ollama, etc.)
 
-### Step 1: Copy the plugin
-
-**macOS / Linux:**
+### Step 1: Install the plugin
 
 ```bash
-cp -r model-router/ ~/.openclaw/extensions/model-router/
+openclaw plugins install /path/to/model-router
 ```
 
-**Windows (PowerShell):**
+Or from this repo:
 
-```powershell
-Copy-Item -Recurse model-router\ "$env:USERPROFILE\.openclaw\extensions\model-router\"
+```bash
+git clone https://github.com/sputnicyoji/openclaw_modleRouterPlugin.git
+openclaw plugins install openclaw_modleRouterPlugin/model-router
 ```
 
-Only copy the `model-router/` directory -- the rest of this repo (docs, tests, openclaw source) is for development only.
+### Step 2: Enable prompt injection
 
-### Step 2: Edit OpenClaw config
-
-Open your OpenClaw config file:
-
-- **macOS / Linux:** `~/.openclaw/config.json5`
-- **Windows:** `%USERPROFILE%\.openclaw\config.json5`
-
-Add the following:
-
-```json5
-{
-  // ... existing config ...
-  plugins: {
-    allow: [
-      "model-router"
-      // ... other allowed plugins ...
-    ],
-    entries: {
-      "model-router": {
-        hooks: {
-          allowPromptInjection: true
-        }
-      }
-    }
-  }
-}
+```bash
+openclaw config set plugins.entries.model-router.hooks.allowPromptInjection true
 ```
 
 `allowPromptInjection: true` is **required** -- without it, OpenClaw's security layer silently drops the `before_prompt_build` hook and routing rules will never be injected.
@@ -82,16 +57,9 @@ openclaw gateway stop
 openclaw gateway start
 ```
 
-Or if using the dev loop:
-
-```bash
-# Ctrl+C to stop, then:
-openclaw gateway start
-```
-
 ### Step 4: Verify
 
-In any connected channel (Telegram, Discord, CLI, etc.):
+In any connected channel (Telegram, Discord, Web UI, etc.):
 
 ```
 /route add test rule

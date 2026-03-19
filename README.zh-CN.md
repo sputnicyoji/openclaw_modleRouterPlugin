@@ -29,48 +29,23 @@
 - OpenClaw v2026.3.0+ 已安装并运行 (通过 `npm install -g openclaw` 或平台安装器)
 - 至少配置了一个模型 Provider (Anthropic、OpenAI、Ollama 等)
 
-### 步骤 1: 复制插件
-
-**macOS / Linux:**
+### 步骤 1: 安装插件
 
 ```bash
-cp -r model-router/ ~/.openclaw/extensions/model-router/
+openclaw plugins install /path/to/model-router
 ```
 
-**Windows (PowerShell):**
+或从本仓库安装:
 
-```powershell
-Copy-Item -Recurse model-router\ "$env:USERPROFILE\.openclaw\extensions\model-router\"
+```bash
+git clone https://github.com/sputnicyoji/openclaw_modleRouterPlugin.git
+openclaw plugins install openclaw_modleRouterPlugin/model-router
 ```
 
-只需要复制 `model-router/` 目录 -- 仓库中的其他内容 (docs、tests、openclaw 源码) 仅供开发使用。
+### 步骤 2: 启用 prompt 注入权限
 
-### 步骤 2: 编辑 OpenClaw 配置
-
-打开 OpenClaw 配置文件:
-
-- **macOS / Linux:** `~/.openclaw/config.json5`
-- **Windows:** `%USERPROFILE%\.openclaw\config.json5`
-
-添加以下内容:
-
-```json5
-{
-  // ... 已有配置 ...
-  plugins: {
-    allow: [
-      "model-router"
-      // ... 其他已允许的插件 ...
-    ],
-    entries: {
-      "model-router": {
-        hooks: {
-          allowPromptInjection: true
-        }
-      }
-    }
-  }
-}
+```bash
+openclaw config set plugins.entries.model-router.hooks.allowPromptInjection true
 ```
 
 `allowPromptInjection: true` 是**必需的** -- 没有它，OpenClaw 的安全层会静默丢弃 `before_prompt_build` 钩子，路由规则将永远不会被注入。
@@ -84,7 +59,7 @@ openclaw gateway start
 
 ### 步骤 4: 验证
 
-在任意已连接的通道 (Telegram、Discord、CLI 等) 中:
+在任意已连接的通道 (Telegram、Discord、Web UI 等) 中:
 
 ```
 /route add test rule
